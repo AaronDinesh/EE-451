@@ -30,7 +30,6 @@ def show_introduction_figure():
     plt.tight_layout()
     return img_he
 
-
 # Plot color space distribution 
 def plot_colors_histo(
     img: np.ndarray,
@@ -59,6 +58,7 @@ def plot_colors_histo(
 
     # Use random seed to downsample image colors (increase run speed - 10%)
     mask = np.random.RandomState(seed=0).rand(M, N) < 0.1
+
     
     # Plot base image
     ax = fig.add_subplot(gs[:2, :])
