@@ -83,7 +83,7 @@ Git serves as a valuable tool for collaborative teamwork. To seamlessly access t
 1. Stay up-to-date by fetching and merging changes from the iapr repository into your local branch with: `git pull upstream main`.
 1. Once you've collected the code, push it to your remote repository: `git push origin main`.
 
-Throughout the semester, we will periodically update the `iapr` repository with new labs and the project. To sync with the latest data, execute `git pull upstream main`. Exercise caution for potential conflicts; it's advisable to rename your Juypter Notebooks to `lab_x_SCIPER1_SCIPER2_SCIPER3.ipynb` (See Lab instructions) to prevent accidental overwriting of your code during merges.
+Throughout the semester, we will periodically update the `iapr` repository with new labs and the project. To sync with the latest data, execute `git pull upstream main`. Exercise caution for potential conflicts; it's advisable to rename your Juypter Notebooks to `lab_<lab_number>_group_<group_id>.ipynb` (See Lab instructions) to prevent accidental overwriting of your code during merges.
 
 ### Python editors
 
