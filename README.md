@@ -28,7 +28,7 @@ the [EPFL] master course
 
 The lab assignments aim to impart practical implementation skills related to the topics covered in class and serve as preparation for the final project. The final project is a hands-on endeavor that consolidates the concepts covered throughout the course. The labs themselves are in the form of Jupyter Notebooks, and need to be solved in groups of **three students**. Please make your groups on Moodle before `March 7th`.
 
-It is important to note that the labs will be **graded**. For each lab, each group is required to submit one Jupyter notebook on Moodle, following the naming convention `lab_x_SCIPER1_SCIPER2_SCIPER3.ipynb`, where 'x' indicates the lab number, and SCIPER1, SCIPER2, and SCIPER3 denote the SCIPER of each group member.
+It is important to note that the labs will be **graded**. For each lab, each group is required to submit one Jupyter notebook on Moodle, following the naming convention `lab_<lab_number>_group_<group_id>.ipynb`, where `<lab_number>` indicates the lab number, and `<group_id>` is your group number.
 
 To ensure uniformity and minimize code conflicts, we strongly advise following the provided `Installation Instructions` below.
 
@@ -83,7 +83,7 @@ Git serves as a valuable tool for collaborative teamwork. To seamlessly access t
 1. Stay up-to-date by fetching and merging changes from the iapr repository into your local branch with: `git pull upstream main`.
 1. Once you've collected the code, push it to your remote repository: `git push origin main`.
 
-Throughout the semester, we will periodically update the `iapr` repository with new labs and the project. To sync with the latest data, execute `git pull upstream main`. Exercise caution for potential conflicts; it's advisable to rename your Juypter Notebooks to `lab_x_SCIPER1_SCIPER2_SCIPER3.ipynb` (See Lab instructions) to prevent accidental overwriting of your code during merges.
+Throughout the semester, we will periodically update the `iapr` repository with new labs and the project. To sync with the latest data, execute `git pull upstream main`. Exercise caution for potential conflicts; it's advisable to rename your Juypter Notebooks to `lab_<lab_number>_group_<group_id>.ipynb` (See Lab instructions) to prevent accidental overwriting of your code during merges.
 
 ### Python editors
 
