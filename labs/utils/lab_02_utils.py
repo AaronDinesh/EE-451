@@ -76,7 +76,7 @@ def display_samples(images: np.ndarray, labels:np.ndarray, title: str, cnt: list
         axes[i].set_title(labels[i])
         # Check if need to display contour
         if cnt is not None and len(cnt) == n:
-            axes[i].plot(cnt[i][:, 0], cnt[i][:, 1], 'r-*')
+            axes[i].plot(cnt[i][:, 0], cnt[i][:, 1], 'r-*', markersize=0.1)
 
     # Set title
     plt.suptitle(title)
