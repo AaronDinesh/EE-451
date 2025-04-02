@@ -229,17 +229,20 @@ def check_best_k(find_best_k: Callable, kNNClassifier: Callable,train_x: torch.T
 
 def eval_test_knn(classifier_knn: Callable,compute_metrics:Callable, test_x: torch.Tensor,test_y: torch.Tensor,threshold_val: float):
 
-    test_y_hat, test_y_ood_scores = classifier_knn.predict(test_x)
+    try:
+        test_y_hat, test_y_ood_scores = classifier_knn.predict(test_x)
+        # Compute metrics
+        recall_tumor, recall_stroma, recall_ood, avg_recall = compute_metrics(
+            y=test_y, y_hat=test_y_hat, ood_scores=test_y_ood_scores, threshold=threshold_val)
 
-    # Compute metrics
-    recall_tumor, recall_stroma, recall_ood, avg_recall = compute_metrics(
-        y=test_y, y_hat=test_y_hat, ood_scores=test_y_ood_scores, threshold=threshold_val)
+        # Display metrics
+        print(f"Tumor recall: {recall_tumor*100:.2f}%")
+        print(f"Stroma recall: {recall_stroma*100:.2f}%")
+        print(f"OoD recall: {recall_ood*100:.2f}%")
+        print(f"Average recall: {avg_recall*100:.2f}%")
 
-    # Display metrics
-    print(f"Tumor recall: {recall_tumor*100:.2f}%")
-    print(f"Stroma recall: {recall_stroma*100:.2f}%")
-    print(f"OoD recall: {recall_ood*100:.2f}%")
-    print(f"Average recall: {avg_recall*100:.2f}%")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 ################################################# PART 2 #################################################
@@ -265,16 +268,19 @@ def show_2_figures(path1:str,title1:str,path2:str,title2:str,figsize:tuple):
     return 
 
 def download_data():
+    if not os.path.exists("../data/data_lab_03/part_02/"):
+        url = "https://drive.google.com/uc?id=17xWybfPMJDtC-vZYvsWuwZU1CULPSThq&confirm=t"
+        zip_path = "../data/data_lab_03.zip"  # Change the file name as needed
+        try:
+            gdown.download(url, zip_path, quiet=False, fuzzy=True)
 
-    url = "https://drive.google.com/file/d/17xWybfPMJDtC-vZYvsWuwZU1CULPSThq/view?usp=share_link"
-    zip_path = "../data/data_lab_03.zip"  # Change the file name as needed
-    gdown.download(url, zip_path, quiet=False, fuzzy=True)
+            os.makedirs("../data/", exist_ok=True)
 
-    os.makedirs("../data/", exist_ok=True)
-
-    # Extract the ZIP file
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall("../data/")
+            # Extract the ZIP file
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall("../data/")
+        except Exception as e:
+            print(f"An error occurred: -- Please download the data manually from {url} and unzip it in the correct folder")
 
 
 def load_data_2(DHMC2Cls, path):
@@ -297,13 +303,16 @@ def create_dataset(DHMC2Cls:Callable):
         status (str): Return "Successful" of all tests passed, "Failed" otherwise
     """
     # Run the block to build the train and validation datasets
-    dataroot = "../data/data_lab_03/part_02"
-    train_dataset = load_data_2(DHMC2Cls,  "dhmc_train.pth")
-    val_dataset = load_data_2(DHMC2Cls,  "dhmc_val.pth")
+    try:
+        train_dataset = load_data_2(DHMC2Cls,  "dhmc_train.pth")
+        val_dataset = load_data_2(DHMC2Cls,  "dhmc_val.pth")
 
-    # Create loaders
-    train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
+        # Create loaders
+        train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None, None
     try:
         # Perform sanity check of the training dataset creation
         assert len(train_dataset) == 59
@@ -379,24 +388,27 @@ def test(model : nn.Module, test_loader : DataLoader):
         f1 (float): The F1 score on the given dataset
         loss (float): Averaged loss on the given dataset
     """
-    model.eval()
+    try:
+        model.eval()
 
-    preds_dict = {"preds" : torch.Tensor(), "labels" : torch.Tensor(), 'losses': torch.Tensor()}
-    for features, labels, _, _ in test_loader:
-        # Forward and loss
-        preds = model(features)
-        loss = F.cross_entropy(preds, labels)
-        
-        # Store values
-        preds_dict["preds"] = torch.cat([preds_dict["preds"], preds.argmax(1)])
-        preds_dict["labels"] = torch.cat([preds_dict["labels"], labels])
-        preds_dict["losses"] = torch.cat([preds_dict["losses"], loss[None]])
+        preds_dict = {"preds" : torch.Tensor(), "labels" : torch.Tensor(), 'losses': torch.Tensor()}
+        for features, labels, _, _ in test_loader:
+            # Forward and loss
+            preds = model(features)
+            loss = F.cross_entropy(preds, labels)
+            
+            # Store values
+            preds_dict["preds"] = torch.cat([preds_dict["preds"], preds.argmax(1)])
+            preds_dict["labels"] = torch.cat([preds_dict["labels"], labels])
+            preds_dict["losses"] = torch.cat([preds_dict["losses"], loss[None]])
 
-    # Compute metric and loss
-    f1 = f1_score(preds_dict["labels"], preds_dict["preds"], average="macro")
-    loss = preds_dict["losses"].mean()
+        # Compute metric and loss
+        f1 = f1_score(preds_dict["labels"], preds_dict["preds"], average="macro")
+        loss = preds_dict["losses"].mean()
 
-    return f1, loss
+        print(f"Test F1 score: {100*f1:.2f}%")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 
@@ -411,32 +423,36 @@ def plot_training(model, train: Callable, train_loader, val_loader, epochs, opti
         train_loss (List): (E,) List of training losses for each epoch
     """
     # Run training and display results
-    best_model, best_f1, best_epoch, val_accs, val_loss, train_loss = train(model, train_loader, val_loader, n_epochs=epochs, optimizer=optimizer)
-    print(f"Best model at epoch {best_epoch} -> {100*best_f1:.2f}% F1 score")
+    try:
+        best_model, best_f1, best_epoch, val_accs, val_loss, train_loss = train(model, train_loader, val_loader, n_epochs=epochs, optimizer=optimizer)
+        print(f"Best model at epoch {best_epoch} -> {100*best_f1:.2f}% F1 score")
 
-    # Create plot
-    _, axes = plt.subplots(1, 2, figsize=(12, 4))
-    es = np.arange(1, len(val_accs)+1)
-    # Plot F1 score
-    axes[0].plot(es, val_accs, label="Val")
-    axes[0].vlines(best_epoch, ymin=np.min(val_accs), ymax=np.max(val_accs), color='k', ls='--', label="Best epoch")
-    axes[0].set_xlabel("Training steps")
-    axes[0].set_ylabel("F1-score")
-    axes[0].set_title("F1-score")
-    axes[0].legend()
+        # Create plot
+        _, axes = plt.subplots(1, 2, figsize=(12, 4))
+        es = np.arange(1, len(val_accs)+1)
+        # Plot F1 score
+        axes[0].plot(es, val_accs, label="Val")
+        axes[0].vlines(best_epoch, ymin=np.min(val_accs), ymax=np.max(val_accs), color='k', ls='--', label="Best epoch")
+        axes[0].set_xlabel("Training steps")
+        axes[0].set_ylabel("F1-score")
+        axes[0].set_title("F1-score")
+        axes[0].legend()
 
-    # Plot losses
-    axes[1].plot(es, val_loss, label="Val")
-    axes[1].plot(es, train_loss, label="Train")
-    axes[1].vlines(best_epoch, ymin=np.min(train_loss), ymax=np.max(val_loss), color='k', ls='--', label="Best epoch")
-    axes[1].set_xlabel("Training steps")
-    axes[1].set_ylabel("Loss")
-    axes[1].set_title("Losses")
-    axes[1].legend()
-    
-    plt.tight_layout()
+        # Plot losses
+        axes[1].plot(es, val_loss, label="Val")
+        axes[1].plot(es, train_loss, label="Train")
+        axes[1].vlines(best_epoch, ymin=np.min(train_loss), ymax=np.max(val_loss), color='k', ls='--', label="Best epoch")
+        axes[1].set_xlabel("Training steps")
+        axes[1].set_ylabel("Loss")
+        axes[1].set_title("Losses")
+        axes[1].legend()
+        
+        plt.tight_layout()
 
-    return best_model
+        return best_model
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
 
 def sanity_gated(func_gated: Callable):
     """ Automatic check of implementation, DO NOT Modify
@@ -516,51 +532,55 @@ def plot_attention(model, test_loader):
         model (nn.Module): Model 
         test_loader (Dataloader): Data loader for the test set
     """
-    dataroot = "../data/data_lab_03/part_02"
-    # Define new plot
-    fig, ax = plt.subplots(2, 2, figsize=(16, 10), height_ratios=[3, 2], width_ratios=[1, 1.25])
+    try:
+        dataroot = "../data/data_lab_03/part_02"
+        # Define new plot
+        fig, ax = plt.subplots(2, 2, figsize=(16, 10), height_ratios=[3, 2], width_ratios=[1, 1.25])
 
-    # iterate over slides
-    for i, (features, _, wsi_id, coordinates) in enumerate(test_loader):
+        # iterate over slides
+        for i, (features, _, wsi_id, coordinates) in enumerate(test_loader):
 
-        # Get data and paths
-        wsi_id = wsi_id[0]
-        slide_path = os.path.join(dataroot, f"{wsi_id}.jpg")
-        # Forward path
-        attention = model.pool(model.proj(features.squeeze()), attention_only=True).squeeze()
+            # Get data and paths
+            wsi_id = wsi_id[0]
+            slide_path = os.path.join(dataroot, f"{wsi_id}.jpg")
+            # Forward path
+            attention = model.pool(model.proj(features.squeeze()), attention_only=True).squeeze()
 
-        # Get WSI dim (Hardcoded)
-        if wsi_id == "DHMC_0001":
-            label = "Solid"
-            wsi_dim= (39839, 30468)
-        elif wsi_id == "DHMC_0007":
-            label = "Acinar"
-            wsi_dim = (47808, 22631)
-        else:
-            raise NotImplementedError("There is a problem !")
+            # Get WSI dim (Hardcoded)
+            if wsi_id == "DHMC_0001":
+                label = "Solid"
+                wsi_dim= (39839, 30468)
+            elif wsi_id == "DHMC_0007":
+                label = "Acinar"
+                wsi_dim = (47808, 22631)
+            else:
+                raise NotImplementedError("There is a problem !")
 
-        # Plot results
-        slide_im = np.array(Image.open(slide_path))
-        ax[i][0].imshow(slide_im)
-        ax[i][0].set_title(label)
-        ax[i][0].axis('off')
-        
-        # Show prediction overlay
-        prob_map = build_prediction_map(
-                coords_x=coordinates[0,:, 0].numpy(),
-                coords_y=coordinates[0,:, 1].numpy(),
-                feature=attention[:, None],
-                wsi_dim=wsi_dim,
-                default=0,
-        )[:, :, 0]
+            # Plot results
+            slide_im = np.array(Image.open(slide_path))
+            ax[i][0].imshow(slide_im)
+            ax[i][0].set_title(label)
+            ax[i][0].axis('off')
+            
+            # Show prediction overlay
+            prob_map = build_prediction_map(
+                    coords_x=coordinates[0,:, 0].numpy(),
+                    coords_y=coordinates[0,:, 1].numpy(),
+                    feature=attention[:, None],
+                    wsi_dim=wsi_dim,
+                    default=0,
+            )[:, :, 0]
 
-        # Rescale to ouput map size
-        prob_map = F.interpolate(torch.Tensor(prob_map)[None, None], slide_im.shape[:2], mode='bilinear', align_corners=False)[0, 0]
+            # Rescale to ouput map size
+            prob_map = F.interpolate(torch.Tensor(prob_map)[None, None], slide_im.shape[:2], mode='bilinear', align_corners=False)[0, 0]
 
-        # Plot prediction map
-        ax[i][1].imshow(slide_im)
-        pcm = ax[i][1].imshow(prob_map, cmap=matplotlib.colormaps['hot'], vmax=torch.quantile(attention, q=0.99), alpha=0.5)
-        ax[i][1].axis('off')
-        # Add colorbar
-        fig.colorbar(pcm, ax=ax[i][1])
-        plt.tight_layout()
+            # Plot prediction map
+            ax[i][1].imshow(slide_im)
+            pcm = ax[i][1].imshow(prob_map, cmap=matplotlib.colormaps['hot'], vmax=torch.quantile(attention, q=0.99), alpha=0.5)
+            ax[i][1].axis('off')
+            # Add colorbar
+            fig.colorbar(pcm, ax=ax[i][1])
+            plt.tight_layout()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
