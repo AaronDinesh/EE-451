@@ -399,7 +399,7 @@ project/iapr_project_ta.ipynb
 project/precomputed/*
 
 data/data_lab_02/*
-
+data/data_lab_03/*
 generate_features_lab_03.py
 timm-0.5.4.tar
 ctranspath.pth
