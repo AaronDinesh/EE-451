@@ -388,28 +388,24 @@ def test(model : nn.Module, test_loader : DataLoader):
         f1 (float): The F1 score on the given dataset
         loss (float): Averaged loss on the given dataset
     """
-    try:
-        model.eval()
+    model.eval()
 
-        preds_dict = {"preds" : torch.Tensor(), "labels" : torch.Tensor(), 'losses': torch.Tensor()}
-        for features, labels, _, _ in test_loader:
-            # Forward and loss
-            preds = model(features)
-            loss = F.cross_entropy(preds, labels)
-            
-            # Store values
-            preds_dict["preds"] = torch.cat([preds_dict["preds"], preds.argmax(1)])
-            preds_dict["labels"] = torch.cat([preds_dict["labels"], labels])
-            preds_dict["losses"] = torch.cat([preds_dict["losses"], loss[None]])
+    preds_dict = {"preds" : torch.Tensor(), "labels" : torch.Tensor(), 'losses': torch.Tensor()}
+    for features, labels, _, _ in test_loader:
+        # Forward and loss
+        preds = model(features)
+        loss = F.cross_entropy(preds, labels)
+        
+        # Store values
+        preds_dict["preds"] = torch.cat([preds_dict["preds"], preds.argmax(1)])
+        preds_dict["labels"] = torch.cat([preds_dict["labels"], labels])
+        preds_dict["losses"] = torch.cat([preds_dict["losses"], loss[None]])
 
-        # Compute metric and loss
-        f1 = f1_score(preds_dict["labels"], preds_dict["preds"], average="macro")
-        loss = preds_dict["losses"].mean()
+    # Compute metric and loss
+    f1 = f1_score(preds_dict["labels"], preds_dict["preds"], average="macro")
+    loss = preds_dict["losses"].mean()
 
-        print(f"Test F1 score: {100*f1:.2f}%")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
+    return f1, loss
 
 
 def plot_training(model, train: Callable, train_loader, val_loader, epochs, optimizer):
