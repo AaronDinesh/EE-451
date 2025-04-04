@@ -328,7 +328,8 @@ def create_dataset(DHMC2Cls:Callable):
         assert wsi_id == 'DHMC_0008'
         assert coord[0, 0] == 21697
         
-    except Exception:
+    except Exception as e:
+        print(f"Exception: {e}")
         print("Failed :(")
 
     print("Successful :)")
