@@ -407,7 +407,11 @@ def test(model : nn.Module, test_loader : DataLoader):
         f1 = f1_score(preds_dict["labels"], preds_dict["preds"], average="macro")
         loss = preds_dict["losses"].mean()
 
+
         print(f"Test F1 score: {100*f1:.2f}%")
+        print(f1)
+        print(loss)
+        return f1,loss
     except Exception as e:
         print(f"An error occurred: {e}")
 
