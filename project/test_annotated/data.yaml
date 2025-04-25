@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 13
+names: ['Amandina', 'Arabia', 'Comtesse', 'Creme_brulee', 'Jelly_Black', 'Jelly_Milk', 'Jelly_White', 'Noblesse', 'Noir_authentique', 'Passion_au_lait', 'Stracciatella', 'Tentation_noir', 'Triangolo']
+
+roboflow:
+  workspace: iapr-data-annotation
+  project: test-wweyn
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/iapr-data-annotation/test-wweyn/dataset/1
