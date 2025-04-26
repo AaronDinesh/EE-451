@@ -270,8 +270,7 @@ def yolo_loss(pred, target):
 
     return coord_loss + obj_loss + cls_loss
 
-def Train_Model(model: nn.Module,EPOCHS: int, optimizer: Optimizer, device: torch.device, per_epoch_save: int, loader: DataLoader ):
-
+def Train_Model(model: nn.Module,EPOCHS: int, optimizer: Optimizer, device: torch.device, per_epoch_save: int, loader: DataLoader, name_of_saved_pt : str ):
     for epoch in range(EPOCHS):
         model.train()
         total_loss = 0
@@ -289,7 +288,7 @@ def Train_Model(model: nn.Module,EPOCHS: int, optimizer: Optimizer, device: torc
             loop.set_postfix(loss=loss.item())
     
         if (epoch + 1) % per_epoch_save == 0 or (epoch + 1) == EPOCHS:
-            model_path = f"models/YOLOv8Lite_epoch{epoch+1}.pt"
+            model_path = "models/" + f"{name_of_saved_pt}{epoch+1}.pt"
             torch.save(model.state_dict(), model_path)
             print(f"✅ Model saved to: {model_path}")
     
@@ -655,7 +654,7 @@ def CREATE_TABLE_FROM_PT(model_path: str, model_class: torch.nn.Module,IMG_PARAM
 
     all_rows = []
 
-    for idx, img_path in enumerate(image_paths):
+    for idx, img_path in tqdm(enumerate(image_paths), total=len(image_paths), desc="Processing Images"):
         img = Image.open(img_path).convert("RGB")
         img_resized = img.resize((IMG_SIZE, IMG_SIZE))
         img_tensor = T.ToTensor()(img_resized).unsqueeze(0).to(device)
@@ -697,8 +696,6 @@ def CREATE_TABLE_FROM_PT(model_path: str, model_class: torch.nn.Module,IMG_PARAM
         row.update(counts)
         all_rows.append(row)
 
-        if (idx + 1) % 10 == 0:
-            print(f"{(idx + 1) / len(image_paths) * 100:.2f}% done")
 
     df = pd.DataFrame(all_rows)
     df = df.set_index("id").sort_index().reset_index()
@@ -732,7 +729,7 @@ def CREATE_TABLE_FROM_PT_NMS(model_path: str, model_class: torch.nn.Module,IMG_P
 
     all_rows = []
 
-    for idx, img_path in enumerate(image_paths):
+    for idx, img_path in tqdm(enumerate(image_paths), total=len(image_paths), desc="Processing Images"):
         img = Image.open(img_path).convert("RGB")
         img_resized = img.resize((IMG_SIZE, IMG_SIZE))
         img_tensor = T.ToTensor()(img_resized).unsqueeze(0).to(device)
@@ -799,8 +796,6 @@ def CREATE_TABLE_FROM_PT_NMS(model_path: str, model_class: torch.nn.Module,IMG_P
         row.update(counts)
         all_rows.append(row)
 
-        if (idx + 1) % 10 == 0:
-            print(f"{(idx + 1) / len(image_paths) * 100:.2f}% done")
 
     df = pd.DataFrame(all_rows)
     df = df.set_index("id").sort_index().reset_index()
@@ -879,7 +874,7 @@ def evaluate_f1_score(pred_df: pd.DataFrame, controller_path: str = "DoNotSubmit
     df = df.sort_values('id').reset_index(drop=True)
 
     class_names = [col for col in gt_df.columns if col != "id"]
-    print(class_names)
+
 
     f1_scores = []
     for _, row in df.iterrows():
