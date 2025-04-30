@@ -1,11 +1,15 @@
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
-from PIL import Image
+from PIL import Image, ImageFilter, ImageDraw, ImageEnhance
+import random
+import numpy as np
 import torch
 import torchvision.transforms as T
+from torchvision.transforms import InterpolationMode
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import yaml
+import os
 
 
 
@@ -140,3 +144,179 @@ def get_test_path(root_dir):
         data_dir = yaml.safe_load(f)
 
     return data_dir['test']
+
+
+# -------------------------------
+# Data Augmentation 
+# -------------------------------
+
+class RandomGaussianNoise:
+    def __init__(self, mean=0., std=0.01, p=0.3):
+        self.mean = mean
+        self.std = std
+        self.p = p
+
+    def __call__(self, tensor):
+        if random.random() < self.p:
+            noise = torch.randn_like(tensor) * self.std + self.mean
+            return tensor + noise
+        return tensor
+
+class RandomGaussianBlur:
+    def __init__(self, radius_min=0.1, radius_max=0.5):
+        self.radius_min = radius_min
+        self.radius_max = radius_max
+
+    def __call__(self, img):
+        radius = random.uniform(self.radius_min, self.radius_max)
+        return img.filter(ImageFilter.GaussianBlur(radius))
+
+class RandomShadow:
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, img):
+        if random.random() > self.p:
+            return img
+
+        shadow = Image.new('L', img.size, 0)
+        draw = ImageDraw.Draw(shadow)
+        for _ in range(random.randint(1, 3)):
+            x1 = random.randint(0, img.width // 2)
+            y1 = random.randint(0, img.height)
+            x2 = random.randint(img.width // 2, img.width)
+            y2 = random.randint(0, img.height)
+            x0, x1_sorted = sorted([x1, x2])
+            y0, y1_sorted = sorted([y1, y2])
+            draw.ellipse([x0, y0, x1_sorted, y1_sorted], fill=random.randint(60, 120))
+
+        shadow = shadow.filter(ImageFilter.GaussianBlur(radius=random.uniform(10, 30)))
+        shadow = shadow.convert("RGB")
+        shadow = ImageEnhance.Brightness(shadow).enhance(0.6)
+        img = Image.blend(img, shadow, alpha=0.5)
+        return img
+
+class RandomBlackLines:
+    def __init__(self, p=0.5, max_lines=5, max_thickness=5):
+        self.p = p
+        self.max_lines = max_lines
+        self.max_thickness = max_thickness
+
+    def __call__(self, img):
+        if random.random() > self.p:
+            return img
+
+        draw = ImageDraw.Draw(img)
+        for _ in range(random.randint(1, self.max_lines)):
+            x1, y1 = random.randint(0, img.width), random.randint(0, img.height)
+            x2, y2 = random.randint(0, img.width), random.randint(0, img.height)
+            thickness = random.randint(2, self.max_thickness)
+            draw.line((x1, y1, x2, y2), fill=(0, 0, 0), width=thickness)
+
+        return img
+
+# -------------------------------
+# Transform 
+# -------------------------------
+
+
+class RandomSubsetTransform:
+    def __init__(self, transforms, num_choices=2):
+        self.transforms = transforms
+        self.num_choices = num_choices
+
+    def __call__(self, img):
+        for t in random.sample(self.transforms, self.num_choices):
+            img = t(img)
+        return img
+    
+
+def get_train_transform():
+    random_augmentations = [
+        T.RandomRotation(30),
+        T.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
+        T.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
+        T.RandomPerspective(distortion_scale=0.5, p=1.0),
+        RandomGaussianBlur(),
+        RandomShadow(p=0.7),
+        RandomBlackLines(p=0.5, max_lines=5, max_thickness=4),
+    ]
+
+    return T.Compose([
+        T.RandomResizedCrop(150),
+        T.RandomHorizontalFlip(),
+        T.RandomVerticalFlip(p=0.2),
+        RandomSubsetTransform(random_augmentations, num_choices=2),
+        T.ToTensor(),
+        RandomGaussianNoise(0., 0.02, p=0.3),
+        T.Normalize(mean=[0.5]*3, std=[0.5]*3)
+    ])
+
+# -------------------------------
+#  CutPaste Chocolate Dataset
+# -------------------------------
+
+class ChocolateCutPasteDataset(Dataset):
+    def __init__(self, image_dir, label_dir, transform=None, cutpaste_p=0.5):
+        self.image_dir = Path(image_dir)
+        self.label_dir = Path(label_dir)
+        self.image_files = sorted([f for f in self.image_dir.iterdir() if f.suffix.lower() == ".jpg"])
+        self.transform = transform
+        self.cutpaste_p = cutpaste_p
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def load_labels(self, label_path, img_width, img_height):
+        boxes = []
+        with open(label_path, "r") as f:
+            for line in f.readlines():
+                cls, x, y, w, h = map(float, line.strip().split())
+                x1 = int((x - w / 2) * img_width)
+                y1 = int((y - h / 2) * img_height)
+                x2 = int((x + w / 2) * img_width)
+                y2 = int((y + h / 2) * img_height)
+                boxes.append((int(cls), x1, y1, x2, y2))
+        return boxes
+
+    def __getitem__(self, idx):
+        img_name = self.image_files[idx].name
+        img_path = self.image_dir / img_name
+        label_path = self.label_dir / img_name.replace(".jpg", ".txt")
+
+        image = Image.open(img_path).convert("RGB")
+        width, height = image.size
+        boxes = self.load_labels(label_path, width, height)
+
+        # CutPaste logic
+        if random.random() < self.cutpaste_p and len(boxes) > 0:
+            donor_idx = random.randint(0, len(self.image_files) - 1)
+            donor_name = self.image_files[donor_idx].name
+            donor_img = Image.open(self.image_dir / donor_name).convert("RGB")
+            donor_boxes = self.load_labels(self.label_dir / donor_name.replace(".jpg", ".txt"), *donor_img.size)
+
+            if donor_boxes:
+                cls, x1, y1, x2, y2 = random.choice(donor_boxes)
+                donor_crop = donor_img.crop((x1, y1, x2, y2))
+
+                crop_w, crop_h = x2 - x1, y2 - y1
+                if crop_w < width and crop_h < height:
+                    paste_x = random.randint(0, width - crop_w)
+                    paste_y = random.randint(0, height - crop_h)
+                    image.paste(donor_crop, (paste_x, paste_y))
+
+                    new_box = (cls, paste_x, paste_y, paste_x + crop_w, paste_y + crop_h)
+                    boxes.append(new_box)
+
+        if self.transform:
+            image = self.transform(image)
+
+        boxes_xyxy = [b[1:] for b in boxes]
+        labels = [b[0] for b in boxes]
+
+        target = {
+            "boxes": torch.tensor(boxes_xyxy, dtype=torch.float32),
+            "labels": torch.tensor(labels, dtype=torch.int64)
+        }
+
+        return image, target
