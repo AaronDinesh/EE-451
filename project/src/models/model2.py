@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
-from src.modules.ConvLayer import ConvLayer
-from src.modules.BottleneckLayer import BottleneckLayer
-from src.modules.C2F import C2F
-from src.modules.SPPF import SPPF
-from src.modules.DFL import DFL
-from src.modules.Detect import Detect, make_anchors
+from src.modules.__ConvLayer import ConvLayer
+from src.modules.__BottleneckLayer import BottleneckLayer
+from src.modules.__C2F import C2F
+from src.modules.__SPPF import SPPF
+from src.modules.__DFL import DFL
+from src.modules.__Detect import Detect, make_anchors
 
 class YOLOv8(nn.Module):
     """YOLOv8 object detection model"""
@@ -128,7 +128,6 @@ class YOLOv8(nn.Module):
         p5_in = torch.cat([pan_p4_down, fpn_p5], 1)  # Concat with previous P5
         pan_p5 = self.head[7](p5_in)  # Process P5
         outputs.append(pan_p5)  # P5 output for detection
-        
         # Detection head
         return self.detect(outputs)
 
@@ -175,12 +174,13 @@ def yolov8_x(pretrained=False, nc=80):
 # Example usage
 if __name__ == "__main__":
     # Create YOLOv8 small model
-    model = yolov8_s(nc=80)
+    model = yolov8_s(nc=13)
     
     # Test with a dummy input
-    x = torch.randn(1, 3, 640, 640)
-    output = model(x)
-    
+    x = torch.randn(2, 3, 640, 640)
+    pred = model(x)
+    breakpoint()
+
     print(f"Input shape: {x.shape}")
-    print(f"Output shape: {output.shape}")
+    print(f"Output shape: {len(pred)}")
     print(f"Model structure: {model}")

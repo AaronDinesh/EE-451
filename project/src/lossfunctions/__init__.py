@@ -1,1 +1,1 @@
-from YOLOLoss import yolo_loss
+from src.lossfunctions.YOLOLoss import yolo_loss

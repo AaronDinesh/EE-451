@@ -1,6 +1,6 @@
 import torch
-from .ConvLayer import ConvLayer
-from .DFL import DFL
+from .__ConvLayer import ConvLayer
+from .__DFL import DFL
 import math
 
 
@@ -46,14 +46,14 @@ class Detect(torch.nn.Module):
             torch.nn.Sequential(
                 ConvLayer(x, channel_2, 3, 1, None),
                 ConvLayer(channel_2, channel_2, 3, 1, None),
-                torch.nn.Conv2d(channel_2, self.reg_max * 4, 1, 1, None)) for x in ch
+                torch.nn.Conv2d(channel_2, self.reg_max * 4, 1)) for x in ch
         )
 
         self.conv3 = torch.nn.ModuleList(
             torch.nn.Sequential(
                 ConvLayer(x, channel_3, 3, 1, None),
                 ConvLayer(channel_3, channel_3, 3, 1, None),
-                torch.nn.Conv2d(channel_3, self.num_classes, 1, 1, None)) for x in ch    
+                torch.nn.Conv2d(channel_3, self.num_classes, 1)) for x in ch    
         )
 
         self.dfl = DFL(self.reg_max) if self.reg_max > 1 else torch.nn.Identity()

@@ -1,5 +1,5 @@
 import torch
-from .ConvLayer import ConvLayer
+from .__ConvLayer import ConvLayer
 
 class BottleneckLayer(torch.nn.Module):
     def __init__(self, shortcut, in_channels):

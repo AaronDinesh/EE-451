@@ -1,5 +1,5 @@
 import torch
-from .ConvLayer import ConvLayer
+from .__ConvLayer import ConvLayer
 
 class SPPF(torch.nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=5):

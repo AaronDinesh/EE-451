@@ -1,6 +1,6 @@
 import torch
-from .ConvLayer import ConvLayer
-from .BottleneckLayer import BottleneckLayer
+from .__ConvLayer import ConvLayer
+from .__BottleneckLayer import BottleneckLayer
 
 class C2F(torch.nn.Module):
     def __init__(self, shortcut, in_channels, out_channels, n_iters):

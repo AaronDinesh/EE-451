@@ -412,3 +412,4 @@ data/project/
 # Ignore environment files
 .virtualenv
 **/*.zip
+**/.venv

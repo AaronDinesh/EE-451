@@ -9,7 +9,7 @@ import matplotlib.patches as patches
 import os
 from tqdm import tqdm
 import numpy as np
-from .lossfunctions import yolo_loss
+from src.lossfunctions.YOLOLoss import yolo_loss
 import cv2
 from typing import Union, List
 import re
@@ -114,41 +114,86 @@ def print_total_paramters(model: nn.Module):
 
 
 ############### Module Training and Evaluation ###############
-def train_model(model: torch.nn.Module,EPOCHS: int, optimizer: torch.optim.Optimizer, device: torch.device, per_epoch_save: int, loader: torch.utils.data.DataLoader, name_of_saved_pt : str ):
-    epoch_prog_bar = tqdm(range(EPOCHS), desc="Training...", leave=False, position=0, total=EPOCHS)
-    BEST_LOSS = np.inf
-    TOTAL_BATCHES = len(loader)
-    loop_prog_bar = tqdm(loader, desc="Processing Image Batch...", leave=False, position=1, total=TOTAL_BATCHES)
+def train_model(model: torch.nn.Module,total_epochs: int, optimizer: torch.optim.Optimizer, device: torch.device, per_epoch_save: int, train_loader, test_loader, plotting_callback: callable, name_of_saved_pt : str ):
+    training_metrics = {}
+    training_metrics["train_loss"] = []
+    training_metrics["train_acc"] = []
+    training_metrics["test_loss"] = []
+    training_metrics["test_acc"] = []
+    training_metrics["epoch"] = []
+    
+    epoch_prog_bar = tqdm(range(total_epochs), desc="Training...", leave=False, position=0, total=total_epochs)
+    best_train_loss = np.inf
+    total_batches = len(train_loader)
+    loop_prog_bar = tqdm(train_loader, desc="Processing Image Batch...", leave=False, position=1, total=total_batches)
     for epoch in epoch_prog_bar:
-        epoch_prog_bar.set_description(f"Epoch {epoch+1}/{EPOCHS}")
+        training_metrics["epoch"].append(epoch)
+        epoch_prog_bar.set_description(f"Epoch {epoch+1}/{total_epochs}")
         model.train()
-        total_loss = 0
+        total_train_loss = 0
+        train_correct = 0
+        train_total = 0
         
         for idx, (imgs, targets) in enumerate(loop_prog_bar):
-            loop_prog_bar.set_description(f"Processing Image Batch {idx+1}/{TOTAL_BATCHES}")
+            loop_prog_bar.set_description(f"Processing Image Batch {idx+1}/{total_batches}")
             imgs, targets = imgs.to(device), targets.to(device)
             outputs = model(imgs)
             loss = yolo_loss(outputs, targets)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            total_loss += loss.item()
+            total_train_loss += loss.item()
             
+
+            with torch.no_grad():
+                # Get class predictions - classes start at index 5 in your implementation
+                # Calculate accuracy on a per-grid-cell basis
+                batch_size, anchors, _, grid_h, grid_w = outputs.shape
+                
+                # Extract class predictions (indices 5 and onwards are class predictions)
+                class_scores = outputs[:, :, 5:, :, :]
+                pred_classes = torch.argmax(class_scores, dim=2)  # [batch_size, anchors, grid_h, grid_w]
+                
+                # Extract target classes (assuming targets has shape compatible with your YOLO implementation)
+                # This may need adjustment based on your exact target format
+                target_classes = targets[:, :, 0, :, :].long()  # Assuming first channel is class ID
+                
+                # Compare predictions with targets where there's an object
+                # Assuming object presence is indicated by targets[:, :, 4, :, :] (objectness)
+                obj_mask = targets[:, :, 4, :, :] > 0.5  # Adjust threshold as needed
+                
+                # Count correct predictions (only where objects exist)
+                correct = (pred_classes[obj_mask] == target_classes[obj_mask]).sum().item()
+                total = obj_mask.sum().item()
+                
+                train_correct += correct
+                train_total += total if total > 0 else 1  # Avoid division by zero
+        
             loop_prog_bar.set_postfix(loss=loss.item())
+
+        # Calculate training metrics
+        epoch_train_loss = total_train_loss / len(train_loader)
+        epoch_train_acc = train_correct / train_total if train_total > 0 else 0
+        
+        training_metrics["train_loss"].append(epoch_train_loss)
+        training_metrics["train_acc"].append(epoch_train_acc)
+
+        model.eval()
+        #Stull have to implement test loss and accuracy
     
-        if (epoch + 1) % per_epoch_save == 0 or (epoch + 1) == EPOCHS:
+        if (epoch + 1) % per_epoch_save == 0 or (epoch + 1) == total_epochs:
             model_path = "models/" + f"{name_of_saved_pt}_{epoch+1}.pt"
             torch.save(model.state_dict(), model_path)
             print(f"Model saved to: {model_path}")
     
-        if total_loss < BEST_LOSS:
-            BEST_LOSS = total_loss
+        if total_train_loss < best_train_loss:
+            best_train_loss = total_train_loss
             best_model_path = "models/" + f"{name_of_saved_pt}_best.pt"
             torch.save(model.state_dict(), best_model_path)
-            print(f"New best loss: {BEST_LOSS:.4f}")
+            print(f"New best loss: {best_train_loss:.4f}")
             print(f"Best model saved to: {best_model_path}")
 
-        print(f"Epoch {epoch+1}/{EPOCHS}, Total Loss: {total_loss:.4f}")
+        print(f"Epoch {epoch+1}/{total_epochs}, Total Loss: {total_train_loss:.4f}")
 
     return model
 
@@ -311,7 +356,7 @@ def find_image_path_by_partial_name(test_dir, partial_name):
             return os.path.join(test_dir, f)
     return None
 
-def use_model_on_image_without_nms(root_dir: str, image_names: list, model: torch.nn.Module, IMG_PARAM: dict, conf_threshold: float = 0.2):
+def use_model_on_image_without_nms_by_name(root_dir: str, image_names: list, model: torch.nn.Module, IMG_PARAM: dict, conf_threshold: float = 0.2):
     # Image and model parameters
     IMG_SIZE = IMG_PARAM["IMG_SIZE"]
     ANCHORS = IMG_PARAM["ANCHOR"]
@@ -362,7 +407,7 @@ def use_model_on_image_without_nms(root_dir: str, image_names: list, model: torc
         plt.show()
 
 
-def use_model_on_image_with_nms(root_dir: str, image_names: list, model: torch.nn.Module, IMG_PARAM: dict, conf_threshold: float = 0.2, min_dist: float = 40.0):
+def use_model_on_image_with_nms_by_name(root_dir: str, image_names: list, model: torch.nn.Module, IMG_PARAM: dict, conf_threshold: float = 0.2, min_dist: float = 40.0):
     # Image and model parameters
     IMG_SIZE = IMG_PARAM["IMG_SIZE"]
     ANCHORS = IMG_PARAM["ANCHOR"]
@@ -430,7 +475,7 @@ def use_model_on_image_with_nms(root_dir: str, image_names: list, model: torch.n
 ##############################################################
 
 ############### Submission Exporting Functions ###############
-def CREATE_TABLE_FROM_PT(data_root_dir: str, output_dir_root: str, model_path: str, model_class: torch.nn.Module, IMG_PARAM, conf_threshold: float = 0.2):
+def create_table_from_pt(data_root_dir: str, output_dir_root: str, model_path: str, model_class: torch.nn.Module, IMG_PARAM, conf_threshold: float = 0.2):
     
     COLS = list(get_yolo_to_col().values())
     YOLO_NAMES = get_yolo_names()
@@ -494,8 +539,10 @@ def CREATE_TABLE_FROM_PT(data_root_dir: str, output_dir_root: str, model_path: s
     return df
 
 
-def CREATE_TABLE_FROM_PT_NMS(data_root_dir: str, output_dir_root: str, model_path: str, model_class: torch.nn.Module,IMG_PARAM, conf_threshold: float = 0.2, min_dist: float = 30.0):
+def create_table_from_pt_nms(data_root_dir: str=None, output_dir_root: str=None, model_path: str=None, model_class: torch.nn.Module=None,IMG_PARAM=None, conf_threshold: float = 0.2, min_dist: float = 30.0):
     
+    #TODO: Check and throw error if some of the required parameters are None
+
     COLS = list(get_yolo_to_col().values())
     YOLO_NAMES = get_yolo_names()
     YOLO_TO_COL = get_yolo_to_col()
@@ -581,7 +628,12 @@ def CREATE_TABLE_FROM_PT_NMS(data_root_dir: str, output_dir_root: str, model_pat
 
     # Save file
     check_df(df, df_name="Generated Submission")
-    output_path = f"submission_conf{int(conf_threshold * 100)}_dist{int(min_dist)}.csv"
+    if output_dir_root is None:
+        output_path = f"submission_conf{int(conf_threshold * 100)}_dist{int(min_dist)}.csv"
+        print(f"Saving to the default location {os.getcwd()}/{output_path}")
+    else:
+        output_path = Path(f'{output_dir_root}/submission_conf{int(conf_threshold * 100)}_dist{int(min_dist)}.csv')
+        print(f"Saving to {output_path}")
     df.to_csv(output_path, index=False)
     print(f"\nSaved filtered CSV to: {output_path}")
     return df
