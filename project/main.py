@@ -29,6 +29,8 @@ class Args:
         self.lr_backbone = 1e-4
         # Loss coefficients
         self.cls_loss_coef = 2.0
+        self.enc_n_points = 4
+        self.dec_n_points = 4
         self.bbox_loss_coef = 5.0
         self.giou_loss_coef = 2.0
         self.focal_alpha = 0.25
@@ -84,13 +86,14 @@ class YOLODataset(Dataset):
         self.transform = transform
         self.is_train = is_train
 
-        self.img_files = os.listdir(os.path.join(img_dir, "*.jpg")) # Add other extensions if needed
+        self.img_files = os.listdir(img_dir) # Add other extensions if needed
 
     def __len__(self):
         return len(self.img_files)
 
     def __getitem__(self, idx):
-        img_path = self.img_files[idx]
+        img_path = os.path.join(self.img_dir, self.img_files[idx])
+        #img_path = self.img_files[idx]
         image = Image.open(img_path).convert("RGB")
         original_w, original_h = image.size
 
