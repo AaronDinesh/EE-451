@@ -413,3 +413,4 @@ data/project/
 .virtualenv
 **/*.zip
 **/.venv
+**/.vscode/
