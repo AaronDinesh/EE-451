@@ -414,3 +414,4 @@ data/project/
 **/*.zip
 **/.venv
 **/.vscode/
+**/model_weights/

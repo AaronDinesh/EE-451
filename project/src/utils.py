@@ -114,7 +114,7 @@ def print_total_paramters(model: nn.Module):
 
 
 ############### Module Training and Evaluation ###############
-def train_model(model: torch.nn.Module,total_epochs: int, optimizer: torch.optim.Optimizer, device: torch.device, per_epoch_save: int, train_loader, test_loader, plotting_callback: callable, name_of_saved_pt : str ):
+def train_model(model: torch.nn.Module,total_epochs: int, optimizer: torch.optim.Optimizer, device: torch.device, per_epoch_save: int, train_loader, test_loader, plotting_callback: callable, name_of_saved_pt: str, pt_save_path: str):
     training_metrics = {}
     training_metrics["train_loss"] = []
     training_metrics["train_acc"] = []
@@ -146,7 +146,6 @@ def train_model(model: torch.nn.Module,total_epochs: int, optimizer: torch.optim
             
 
             with torch.no_grad():
-                # Get class predictions - classes start at index 5 in your implementation
                 # Calculate accuracy on a per-grid-cell basis
                 batch_size, anchors, _, grid_h, grid_w = outputs.shape
                 
@@ -154,14 +153,11 @@ def train_model(model: torch.nn.Module,total_epochs: int, optimizer: torch.optim
                 class_scores = outputs[:, :, 5:, :, :]
                 pred_classes = torch.argmax(class_scores, dim=2)  # [batch_size, anchors, grid_h, grid_w]
                 
-                # Extract target classes (assuming targets has shape compatible with your YOLO implementation)
-                # This may need adjustment based on your exact target format
-                target_classes = targets[:, :, 0, :, :].long()  # Assuming first channel is class ID
-                
                 # Compare predictions with targets where there's an object
                 # Assuming object presence is indicated by targets[:, :, 4, :, :] (objectness)
-                obj_mask = targets[:, :, 4, :, :] > 0.5  # Adjust threshold as needed
-                
+                obj_mask = targets[..., 4] > 0.5  # Adjust threshold as needed
+                target_class_probs = targets[..., 5:]
+                target_classes = torch.argmax(target_class_probs, dim=-1).long()
                 # Count correct predictions (only where objects exist)
                 correct = (pred_classes[obj_mask] == target_classes[obj_mask]).sum().item()
                 total = obj_mask.sum().item()
@@ -182,13 +178,13 @@ def train_model(model: torch.nn.Module,total_epochs: int, optimizer: torch.optim
         #Stull have to implement test loss and accuracy
     
         if (epoch + 1) % per_epoch_save == 0 or (epoch + 1) == total_epochs:
-            model_path = "models/" + f"{name_of_saved_pt}_{epoch+1}.pt"
+            model_path = os.path.join(f"{pt_save_path}/", f"{name_of_saved_pt}_{epoch+1}.pt")
             torch.save(model.state_dict(), model_path)
             print(f"Model saved to: {model_path}")
     
         if total_train_loss < best_train_loss:
             best_train_loss = total_train_loss
-            best_model_path = "models/" + f"{name_of_saved_pt}_best.pt"
+            best_model_path = os.path.join(f"{pt_save_path}/", f"{name_of_saved_pt}_best.pt")
             torch.save(model.state_dict(), best_model_path)
             print(f"New best loss: {best_train_loss:.4f}")
             print(f"Best model saved to: {best_model_path}")
