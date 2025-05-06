@@ -1,12 +1,16 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
 import math
 import copy
 from src.modules.NestedTensor import NestedTensor, nested_tensor_from_tensor_list
 from src.modules.activations import inverse_sigmoid
 from src.modules.losses import sigmoid_focal_loss, accuracy
 import src.modules.box_ops as box_ops
+from src.modules.PositionEncoding import build_position_encoding
+from typing import Dict, List
+from collections import OrderedDict
 from src.modules.DeformAttn import MSDeformAttn
 from scipy.optimize import linear_sum_assignment
 
@@ -241,6 +245,66 @@ class SetCriterion(nn.Module):
 
         return losses
     
+## ----- Backbone ----- ##
+class Backbone(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.body = nn.Sequential(OrderedDict([
+            ("conv1", nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)),
+            ("bn1", nn.BatchNorm2d(64)),
+            ("relu1", nn.ReLU(inplace=True)),
+            ("pool", nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
+            ("conv2", nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)),
+            ("bn2", nn.BatchNorm2d(128)),
+            ("relu2", nn.ReLU(inplace=True)),
+        ]))
+        self.strides = [8]  # downsampling by 8x (2 × 2 × 2)
+        self.num_channels = [128]
+
+    def forward(self, nested_tensor: "NestedTensor") -> Dict[str, "NestedTensor"]:
+        x, mask = nested_tensor.decompose()  # (B, C, H, W), (B, H, W)
+        x = self.body(x)
+        mask = nn.functional.interpolate(mask[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
+        out = {"0": NestedTensor(x, mask)}
+        return out
+
+class Joiner(nn.Sequential):
+    def __init__(self, backbone, position_embedding):
+        super().__init__(backbone, position_embedding)
+        self.strides = backbone.strides
+        self.num_channels = backbone.num_channels
+
+    def forward(self, tensor_list: NestedTensor):
+        xs = self[0](tensor_list)
+        out: List[NestedTensor] = []
+        pos = []
+        for name, x in sorted(xs.items()):
+            out.append(x)
+
+        # position encoding
+        for x in out:
+            pos.append(self[1](x).to(x.tensors.dtype))
+
+        return out, pos
+
+"""def build_backbone(args):
+    position_embedding = build_position_encoding(args)
+    train_backbone = args.lr_backbone > 0
+    return_interm_layers = args.masks or (args.num_feature_levels > 1)
+    backbone = Backbone(args.backbone, train_backbone, return_interm_layers, args.dilation)
+    model = Joiner(backbone, position_embedding)
+    return model
+"""
+
+def build_backbone(args):
+    position_embedding = build_position_encoding(args)
+    backbone = Backbone()
+    model = Joiner(backbone, position_embedding)
+    return model
+
+## ----- End Backbone ----- ##
+
+
 class DeformableTransformerEncoderLayer(nn.Module):
     def __init__(self,
                  d_model=256, d_ffn=1024,
