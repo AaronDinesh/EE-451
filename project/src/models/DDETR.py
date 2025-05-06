@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision
 import math
 import copy
 from src.modules.NestedTensor import NestedTensor, nested_tensor_from_tensor_list
@@ -50,6 +49,8 @@ class DDETR(nn.Module):
         hidden_dim = transformer.d_model
         self.class_embed = nn.Linear(hidden_dim, num_classes)
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
+        
+        #This determines how many feature levels from the CNN backbone are used in the transformer.
         self.num_feature_levels = num_feature_levels
 
 
@@ -139,8 +140,7 @@ class DDETR(nn.Module):
                 pos.append(pos_l)
 
         query_embeds = None
-        if not self.two_stage:
-            query_embeds = self.query_embed.weight
+        query_embeds = self.query_embed.weight
         hs, init_reference, inter_references, enc_outputs_class, enc_outputs_coord_unact = self.transformer(srcs, masks, pos, query_embeds)
 
         outputs_classes = []
@@ -346,7 +346,6 @@ class DeformableTransformerEncoderLayer(nn.Module):
 
         return src
 
-
 class DeformableTransformerEncoder(nn.Module):
     def __init__(self, encoder_layer, num_layers):
         super().__init__()
@@ -488,10 +487,10 @@ class DeformableTransformerDecoder(nn.Module):
         return output, reference_points
 
 class DeformableTransformer(nn.Module):
-    def __init__(self, d_model=256, nhead=8,
+    def __init__(self, d_model=128, nhead=8,
                  num_encoder_layers=6, num_decoder_layers=6, dim_feedforward=1024, dropout=0.1,
                  activation="relu", return_intermediate_dec=False,
-                 num_feature_levels=4, dec_n_points=4,  enc_n_points=4):
+                 num_feature_levels=1, dec_n_points=4,  enc_n_points=4):
         super().__init__()
 
         self.d_model = d_model
@@ -540,39 +539,7 @@ class DeformableTransformer(nn.Module):
         # N, L, 4, 64, 2
         pos = torch.stack((pos[:, :, :, 0::2].sin(), pos[:, :, :, 1::2].cos()), dim=4).flatten(2)
         return pos
-
-    def gen_encoder_output_proposals(self, memory, memory_padding_mask, spatial_shapes):
-        N_, S_, C_ = memory.shape
-        base_scale = 4.0
-        proposals = []
-        _cur = 0
-        for lvl, (H_, W_) in enumerate(spatial_shapes):
-            mask_flatten_ = memory_padding_mask[:, _cur:(_cur + H_ * W_)].view(N_, H_, W_, 1)
-            valid_H = torch.sum(~mask_flatten_[:, :, 0, 0], 1)
-            valid_W = torch.sum(~mask_flatten_[:, 0, :, 0], 1)
-
-            grid_y, grid_x = torch.meshgrid(torch.linspace(0, H_ - 1, H_, dtype=torch.float32, device=memory.device),
-                                            torch.linspace(0, W_ - 1, W_, dtype=torch.float32, device=memory.device))
-            grid = torch.cat([grid_x.unsqueeze(-1), grid_y.unsqueeze(-1)], -1)
-
-            scale = torch.cat([valid_W.unsqueeze(-1), valid_H.unsqueeze(-1)], 1).view(N_, 1, 1, 2)
-            grid = (grid.unsqueeze(0).expand(N_, -1, -1, -1) + 0.5) / scale
-            wh = torch.ones_like(grid) * 0.05 * (2.0 ** lvl)
-            proposal = torch.cat((grid, wh), -1).view(N_, -1, 4)
-            proposals.append(proposal)
-            _cur += (H_ * W_)
-        output_proposals = torch.cat(proposals, 1)
-        output_proposals_valid = ((output_proposals > 0.01) & (output_proposals < 0.99)).all(-1, keepdim=True)
-        output_proposals = torch.log(output_proposals / (1 - output_proposals))
-        output_proposals = output_proposals.masked_fill(memory_padding_mask.unsqueeze(-1), float('inf'))
-        output_proposals = output_proposals.masked_fill(~output_proposals_valid, float('inf'))
-
-        output_memory = memory
-        output_memory = output_memory.masked_fill(memory_padding_mask.unsqueeze(-1), float(0))
-        output_memory = output_memory.masked_fill(~output_proposals_valid, float(0))
-        output_memory = self.enc_output_norm(self.enc_output(output_memory))
-        return output_memory, output_proposals
-
+ 
     def get_valid_ratio(self, mask):
         _, H, W = mask.shape
         valid_H = torch.sum(~mask[:, :, 0], 1)
@@ -782,10 +749,9 @@ def build(args):
     weight_dict = {'loss_ce': args.cls_loss_coef, 'loss_bbox': args.bbox_loss_coef}
     weight_dict['loss_giou'] = args.giou_loss_coef
 
-    losses = ['labels', 'boxes', 'cardinality']
 
     # num_classes, matcher, weight_dict, losses, focal_alpha=0.25
-    criterion = SetCriterion(num_classes, matcher, weight_dict, losses, focal_alpha=args.focal_alpha)
+    criterion = SetCriterion(num_classes, matcher, weight_dict, focal_alpha=args.focal_alpha)
     criterion.to(device)
     postprocessors = {'bbox': PostProcess()}
     

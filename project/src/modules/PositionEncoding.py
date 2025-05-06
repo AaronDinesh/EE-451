@@ -4,7 +4,7 @@ import torch
 from torch import nn
 
 
-from NestedTensor import NestedTensor
+from src.modules.NestedTensor import NestedTensor
 
 
 
