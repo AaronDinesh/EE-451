@@ -19,7 +19,7 @@ from check import check_df, COLS, IDS, TermFormat
 import torchvision.transforms.functional as TF
 from torchvision.transforms import InterpolationMode
 import random
-import yaml
+# import yaml
 
 
 try:
@@ -214,9 +214,18 @@ def run_inference(model: torch.nn.Module, path_to_image: Union[List[str], str], 
     model.to(device)
     model.eval()
 
-    if type(path_to_image) == str:
+    # 📝 If it's a string, convert it to a single-item list
+    if isinstance(path_to_image, str):
         images_path = [path_to_image]
+        print("Input is a single string, converting to list.")
+    elif isinstance(path_to_image, list):
+        # Convert Path objects to strings
+        images_path = [str(p) if isinstance(p, Path) else p for p in path_to_image]
+        print("Input is a list of paths.")
+    else:
+        raise ValueError(f"Expected a string or list of strings, but got {type(path_to_image)}")
 
+    
     for img_path in images_path:
         img_orig = Image.open(img_path).convert("RGB")
 
@@ -245,7 +254,8 @@ def use_model_on_images_without_nms(root_dir: str, number_of_images: int, model:
     sampled_paths = np.random.choice(image_paths, size=number_of_images, replace=False).tolist()
 
     for idx, preds in enumerate(run_inference(model, sampled_paths, IMG_PARAM, conf_threshold)):
-        img_resized = cv2.imread(sampled_paths[idx])
+        img_resized = cv2.imread(str(sampled_paths[idx]))
+        img_resized = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)  
         img_resized = cv2.resize(img_resized, (IMG_SIZE, IMG_SIZE))
         img_path = sampled_paths[idx]
         boxes = []
@@ -298,8 +308,9 @@ def use_model_on_images_with_nms(root_dir: str, number_of_images: int, model: to
     
     sampled_paths = np.random.choice(image_paths, size=number_of_images, replace=False).tolist()
  
-    for idx, preds in run_inference(model, sampled_paths, IMG_PARAM, conf_threshold):
-        img_resized = cv2.imread(sampled_paths[idx])
+    for idx, preds in enumerate(run_inference(model, sampled_paths, IMG_PARAM, conf_threshold)):
+        img_resized = cv2.imread(str(sampled_paths[idx]))
+        img_resized = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)  
         img_resized = cv2.resize(img_resized, (IMG_SIZE, IMG_SIZE))
         img_path = sampled_paths[idx]
 
@@ -365,12 +376,13 @@ def use_model_on_image_without_nms_by_name(root_dir: str, image_names: list, mod
     GRID_SIZE = IMG_PARAM["GRID_SIZE"]
     CLASS_NAMES = get_class_names()
 
-    test_dir = Path(f"{root_dir}/test/images")
+    test_dir = Path(f"{root_dir}/images")
     found_partial_names = [find_image_path_by_partial_name(test_dir, name) for name in image_names] 
     img_paths = list(filter(None, found_partial_names))
 
-    for idx, preds in run_inference(model, img_paths, IMG_PARAM, conf_threshold):
-        img_resized = cv2.imread(img_paths[idx])
+    for idx, preds in enumerate(run_inference(model, img_paths, IMG_PARAM, conf_threshold)):
+        img_resized = cv2.imread(str(img_paths[idx]))
+        img_resized = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)  
         img_resized = cv2.resize(img_resized, (IMG_SIZE, IMG_SIZE))
         img_path = img_paths[idx]
         boxes = []
@@ -416,12 +428,13 @@ def use_model_on_image_with_nms_by_name(root_dir: str, image_names: list, model:
     GRID_SIZE = IMG_PARAM["GRID_SIZE"]
     CLASS_NAMES = get_class_names()
 
-    test_dir = Path(f"{root_dir}/test/images")
+    test_dir = Path(f"{root_dir}/images")
     found_partial_names = [find_image_path_by_partial_name(test_dir, name) for name in image_names] 
     img_paths = list(filter(None, found_partial_names))
 
-    for idx, preds in run_inference(model, img_paths, IMG_PARAM, conf_threshold):
-        img_resized = cv2.imread(img_paths[idx])
+    for idx, preds in enumerate(run_inference(model, img_paths, IMG_PARAM, conf_threshold)):
+        img_resized = cv2.imread(str(img_paths[idx]))
+        img_resized = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)  
         img_resized = cv2.resize(img_resized, (IMG_SIZE, IMG_SIZE))
         img_path = img_paths[idx]
 
@@ -477,7 +490,7 @@ def use_model_on_image_with_nms_by_name(root_dir: str, image_names: list, model:
 ##############################################################
 
 ############### Submission Exporting Functions ###############
-def create_table_from_pt(data_root_dir: str, output_dir_root: str, model_path: str, model_class: torch.nn.Module, IMG_PARAM, conf_threshold: float = 0.2):
+def create_table_from_pt_without_nms(data_root_dir: str, output_dir_root: str, model_path: str, model_class: torch.nn.Module, IMG_PARAM, conf_threshold: float = 0.2):
     
     COLS = list(get_yolo_to_col().values())
     YOLO_NAMES = get_yolo_names()
@@ -499,7 +512,7 @@ def create_table_from_pt(data_root_dir: str, output_dir_root: str, model_path: s
 
     all_rows = []
 
-    for idx, preds in tqdm(enumerate(run_inference(model, image_paths, IMG_PARAM, conf_threshold)), total=len(image_paths), desc="Processing Images"):
+    for idx, preds in enumerate(tqdm(run_inference(model, image_paths, IMG_PARAM, conf_threshold), total=len(image_paths), desc="Processing Images")):
         counts = {col: 0 for col in COLS}
 
         for anchor in range(ANCHORS):
@@ -523,7 +536,7 @@ def create_table_from_pt(data_root_dir: str, output_dir_root: str, model_path: s
             print(f"Multiple IDs found in filename: {filename}")
             continue
 
-        file_id = re_matches[0]
+        file_id = int(re_matches[0][1:])
         
         row = {"id": file_id}
         row.update(counts)
@@ -566,7 +579,7 @@ def create_table_from_pt_nms(data_root_dir: str=None, output_dir_root: str=None,
 
     all_rows = []
 
-    for idx, preds in tqdm(enumerate(run_inference(model, image_paths, IMG_PARAM, conf_threshold)), total=len(image_paths), desc="Processing Images"):
+    for idx, preds in enumerate(tqdm(run_inference(model, image_paths, IMG_PARAM, conf_threshold), total=len(image_paths), desc="Processing Images")):
 
         all_boxes = []
 
@@ -617,7 +630,7 @@ def create_table_from_pt_nms(data_root_dir: str=None, output_dir_root: str=None,
             print(f"Multiple IDs found in filename: {filename}")
             continue
 
-        file_id = re_matches[0]
+        file_id = int(re_matches[0][1:])
 
         row = {"id": file_id}
         row.update(counts)
