@@ -415,3 +415,4 @@ data/project/
 **/.venv
 **/.vscode/
 **/model_weights/
+**/output_filter_visualizations
