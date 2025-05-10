@@ -4,7 +4,9 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as T
 from PIL import Image
+import matplotlib.pyplot as plt
 import os
+import json
 import numpy as np
 import time
 from tqdm import tqdm
@@ -44,14 +46,16 @@ class Args:
         self.lr = 1e-4
         self.weight_decay = 1e-4
         self.epochs = 50
-        self.batch_size = 4 # Adjust based on your GPU memory
+        self.batch_size = 2 #4 # Adjust based on your GPU memory
         self.num_workers = 2 # For DataLoader
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.seed = 42
 
         # Data paths (MODIFY THESE)
-        self.train_img_dir = "../data/train/images"
-        self.train_ann_dir = "../data/train/labels"
+        #self.train_img_dir = "../data/train/images"
+        self.train_img_dir = "/Users/lunnet_1/Downloads/All_Data_Final/train_annotated_augmented/all_augmented_images"
+        self.train_ann_dir = "/Users/lunnet_1/Downloads/All_Data_Final/train_annotated_augmented/all_augmented_labels"
+        #self.train_ann_dir = "../data/train/labels"
         self.val_img_dir = "../data/test/images"
         self.val_ann_dir = "../data/test/labels"
         self.img_size = 640
@@ -276,9 +280,11 @@ if __name__ == "__main__":
     transform_train = DDETRTransform(img_size=args.img_size, is_train=True)
     transform_val = DDETRTransform(img_size=args.img_size, is_train=False)
 
+    
     dataset_train = YOLODataset(args.train_img_dir, args.train_ann_dir, args.img_size, args.num_classes, transform=transform_train)
     dataset_val = YOLODataset(args.val_img_dir, args.val_ann_dir, args.img_size, args.num_classes, transform=transform_val)
 
+    
     if not dataset_train:
         print("No training images found. Check 'train_img_dir' and image extensions.")
         exit()
@@ -294,6 +300,14 @@ if __name__ == "__main__":
     print(f"Using device: {args.device}")
     print(f"Found {len(dataset_train)} training images and {len(dataset_val)} validation images.")
 
+    # Track history
+    history = {
+        "train_loss": [],
+        "train_class_err": [],
+        "val_loss": [],
+        "val_class_err": [],
+    }
+
     # --- Training Loop ---
     print("Starting training...")
     best_val_loss = float('inf')
@@ -304,6 +318,11 @@ if __name__ == "__main__":
         lr_scheduler.step()
 
         val_loss, val_class_err = evaluate(model, criterion, data_loader_val, args.device)
+        
+        history["train_loss"].append(train_loss)
+        history["train_class_err"].append(train_class_err)
+        history["val_loss"].append(val_loss)
+        history["val_class_err"].append(val_class_err)
 
         print(f"Epoch {epoch+1} Summary: Train Loss: {train_loss:.4f}, Train ClassErr: {train_class_err:.2f}%")
         print(f"Epoch {epoch+1} Summary: Val Loss: {val_loss:.4f},   Val ClassErr: {val_class_err:.2f}%")
@@ -318,3 +337,37 @@ if __name__ == "__main__":
     # model.load_state_dict(torch.load("ddetr_simplified_best.pth"))
     # final_val_loss, final_val_class_err = evaluate(model, criterion, data_loader_val, args.device)
     # print(f"Final Validation on Best Model: Loss: {final_val_loss:.4f}, ClassError: {final_val_class_err:.2f}%")
+
+    # --- Plotting ---
+    epochs = list(range(1, args.epochs + 1))
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Plot Loss
+    ax1.plot(epochs, history["train_loss"], label="Train Loss", marker='o')
+    ax1.plot(epochs, history["val_loss"], label="Val Loss", marker='o')
+    ax1.set_title("Loss over Epochs")
+    ax1.set_xlabel("Epoch")
+    ax1.set_ylabel("Loss")
+    ax1.legend()
+    ax1.grid(True)
+
+    # Plot Class Error
+    ax2.plot(epochs, history["train_class_err"], label="Train Class Error", marker='s')
+    ax2.plot(epochs, history["val_class_err"], label="Val Class Error", marker='s')
+    ax2.set_title("Class Error over Epochs")
+    ax2.set_xlabel("Epoch")
+    ax2.set_ylabel("Error (%)")
+    ax2.legend()
+    ax2.grid(True)
+
+    plt.tight_layout()
+    plt.savefig("loss_and_error_plots.png")
+    plt.show()
+
+
+    # --- Save history to JSON ---
+    with open("training_history.json", "w") as f:
+        json.dump(history, f, indent=4)
+
+    print("Saved plots and training history to disk.")
