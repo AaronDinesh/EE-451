@@ -46,7 +46,7 @@ class Args:
         self.lr = 1e-4
         self.weight_decay = 1e-4
         self.epochs = 50
-        self.batch_size = 2 #4 # Adjust based on your GPU memory
+        self.batch_size = 4 # Adjust based on your GPU memory
         self.num_workers = 2 # For DataLoader
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.seed = 42
