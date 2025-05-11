@@ -245,8 +245,9 @@ class SetCriterion(nn.Module):
 
         return losses
     
-## ----- Backbone ----- ##
-class Backbone(nn.Module):
+
+
+"""class Backbone(nn.Module):
     def __init__(self):
         super().__init__()
         self.body = nn.Sequential(OrderedDict([
@@ -258,7 +259,14 @@ class Backbone(nn.Module):
             ("bn2", nn.BatchNorm2d(128)),
             ("relu2", nn.ReLU(inplace=True)),
         ]))
-        """self.body = nn.Sequential(OrderedDict([
+        self.strides = [8]  # downlsampling by 8x (2 × 2 × 2)
+        self.num_channels = [128]"""
+
+        
+"""class Backbone(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.body = nn.Sequential(OrderedDict([
             # Block 1
             ("conv1", nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)),
             ("bn1", nn.BatchNorm2d(64)),
@@ -289,12 +297,27 @@ class Backbone(nn.Module):
             ("conv6", nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)),
             ("bn6", nn.BatchNorm2d(512)),
             ("relu6", nn.ReLU(inplace=True)),
-        ]))"""
+        ]))
 
-        self.strides = [8]  # downlsampling by 8x (2 × 2 × 2)
-        self.num_channels = [128]
-        #self.strides = [16]
-        #self.num_channels = [512]
+        self.strides = [16]
+        self.num_channels = [512]"""
+
+## ----- Backbone ----- ##
+#even fewer parameters
+class Backbone(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.body = nn.Sequential(
+            nn.Conv2d(3, 32, 3, 2, 1),     # Smaller kernel, fewer channels
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2, 2),            # Downsample 2x
+            nn.Conv2d(32, 64, 3, 2, 1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True)
+        )
+        self.strides = [8]                # 2x2x2 = 8x downsampling
+        self.num_channels = [64]
 
     def forward(self, nested_tensor: "NestedTensor") -> Dict[str, "NestedTensor"]:
         x, mask = nested_tensor.decompose()  # (B, C, H, W), (B, H, W)
