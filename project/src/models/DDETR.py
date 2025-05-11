@@ -249,7 +249,7 @@ class SetCriterion(nn.Module):
 class Backbone(nn.Module):
     def __init__(self):
         super().__init__()
-        """self.body = nn.Sequential(OrderedDict([
+        self.body = nn.Sequential(OrderedDict([
             ("conv1", nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)),
             ("bn1", nn.BatchNorm2d(64)),
             ("relu1", nn.ReLU(inplace=True)),
@@ -257,8 +257,8 @@ class Backbone(nn.Module):
             ("conv2", nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)),
             ("bn2", nn.BatchNorm2d(128)),
             ("relu2", nn.ReLU(inplace=True)),
-        ]))"""
-        self.body = nn.Sequential(OrderedDict([
+        ]))
+        """self.body = nn.Sequential(OrderedDict([
             # Block 1
             ("conv1", nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)),
             ("bn1", nn.BatchNorm2d(64)),
@@ -289,12 +289,12 @@ class Backbone(nn.Module):
             ("conv6", nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)),
             ("bn6", nn.BatchNorm2d(512)),
             ("relu6", nn.ReLU(inplace=True)),
-        ]))
+        ]))"""
 
-        #self.strides = [8]  # downsampling by 8x (2 × 2 × 2)
-        #self.num_channels = [128]
-        self.strides = [16]
-        self.num_channels = [512]
+        self.strides = [8]  # downlsampling by 8x (2 × 2 × 2)
+        self.num_channels = [128]
+        #self.strides = [16]
+        #self.num_channels = [512]
 
     def forward(self, nested_tensor: "NestedTensor") -> Dict[str, "NestedTensor"]:
         x, mask = nested_tensor.decompose()  # (B, C, H, W), (B, H, W)
