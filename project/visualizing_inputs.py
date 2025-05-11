@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
 from src.models.YOLOv8Lite import YOLOv8Lite
+import torchvision.transforms.functional as T
 
 
 
@@ -77,7 +78,7 @@ def visualize_filters_for_layer(model, layer_name, target_layer_module, num_filt
         optimized_img.requires_grad_(True)
 
         #This optimizer will perform the gradient ascent
-        optimizer = torch.optim.Adam([optimized_img], lr=lr, weight_decay=l2_reg, maximize=True)
+        optimizer = torch.optim.Adam([optimized_img], lr=lr, weight_decay=l2_reg)
 
         for i in tqdm(range(num_iterations), desc="Performing gradient ascent", position=1, total=num_iterations, leave=False):
             optimizer.zero_grad()
@@ -86,23 +87,32 @@ def visualize_filters_for_layer(model, layer_name, target_layer_module, num_filt
             #We do a full forward pass of the model and let the hook we registed before capture the activation of a
             #particular layer.
             _ = model(optimized_img)
+            if layer_name not in activations_dict:
+                raise RuntimeError(f"Hook failed to capture activations for {layer_name}")
             
             # Get the activation from our hook
             layer_output = activations_dict[layer_name]
+            assert not torch.isnan(layer_output).any(), "NaNs in activation!"
             filter_activation = layer_output[0, filter_idx, :, :]
+            print(f"Mean activation for filter {filter_idx}: {filter_activation.mean().item():.4f}")
+
             
             # Compute loss
             loss = torch.mean(filter_activation)
             #We subtract the tv_loss for some regularization
             loss -= tv_loss(optimized_img, weight=tv_reg)
+            loss = -loss
             loss.backward()
             optimizer.step()
             with torch.no_grad():
                 optimized_img.data.clamp_(0, 1)
 
             # Optional: Gaussian blur every few steps to smooth further
-            # if (i + 1) % 25 == 0:
-            #     optimized_img.data = T.GaussianBlur(kernel_size=3, sigma=(0.5, 0.5))(optimized_img.data)
+            if (i + 1) % 25 == 0:
+                optimized_img.data = T.GaussianBlur(kernel_size=3, sigma=(0.5, 0.5))(optimized_img.data)
+
+            if (i + 1) % 10 == 0:
+                print(f"Step {i+1}: loss={-loss.item():.4f}, img_std={optimized_img.std().item():.4f}")
 
         final_pattern_tensor = optimized_img.detach().clone()
         
@@ -142,8 +152,8 @@ def main():
     MAX_FILTERS_PER_LAYER = 4  # Visualize the first N filters of each Conv2D layer
     NUM_ITERATIONS = 400       # Iterations for optimization
     LEARNING_RATE = 0.05       # Learning rate
-    L2_REG_STRENGTH = 1e-5     # L2 regularization (via Adam's weight_decay)
-    TV_REG_STRENGTH = 1e-5     # Total Variation regularization
+    L2_REG_STRENGTH = 1e-3     # L2 regularization (via Adam's weight_decay)
+    TV_REG_STRENGTH = 1e-2     # Total Variation regularization
     OUTPUT_VIS_DIR = "output_filter_visualizations"
     COLOR_MAP = 'viridis'
 
