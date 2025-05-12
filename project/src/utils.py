@@ -753,7 +753,10 @@ def use_model_on_image_with_nms_by_name(root_dir: str, image_names: list, model:
         plt.imshow(img_resized)
         plt.title(f"Prediction (Filtered): {os.path.basename(img_path)}")
         plt.axis('off')
-        plt.show()
+        fig = plt.gcf()
+        
+        return fig
+        
 
 ##############################################################
 
