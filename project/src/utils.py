@@ -453,7 +453,7 @@ def train_model(model: torch.nn.Module, total_epochs: int, optimizer: torch.opti
             print(f"✅ New best loss: {best_train_loss:.4f}")
             print(f"✅ Best model saved to: {best_model_path}")
 
-        if epoch > -1 and f1_test > best_f1_score:
+        if epoch > 80 and f1_test > best_f1_score:
             best_f1_score = f1_test
             f1_best_model = type(model)()  # Create a new instance of the model
             f1_best_model.load_state_dict(model.state_dict())
@@ -915,10 +915,10 @@ def create_table_from_pt_nms(data_root_dir: str=None, output_dir_root: str=None,
     # Save file
     check_df(df, df_name="Generated Submission")
     if output_dir_root is None:
-        output_path = f"submission_conf{int(conf_threshold * 100)}_dist{int(min_dist)}.csv"
+        output_path = f"BEST_SUBMISSION.csv"
         print(f"Saving to the default location {os.getcwd()}/{output_path}")
     else:
-        output_path = Path(f'{output_dir_root}/submission_conf{int(conf_threshold * 100)}_dist{int(min_dist)}.csv')
+        output_path = Path(f'{output_dir_root}/BEST_SUBMISSION.csv')
         print(f"Saving to {output_path}")
     df.to_csv(output_path, index=False)
     print(f"\nSaved filtered CSV to: {output_path}")
