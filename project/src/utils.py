@@ -330,7 +330,7 @@ def calculate_map50(pred_boxes, true_boxes, iou_threshold= 0.000001):
 
 def train_model(model: torch.nn.Module, total_epochs: int, optimizer: torch.optim.Optimizer, device: torch.device, 
                 per_epoch_save: int, train_loader, test_loader, plotting_callback: callable, 
-                name_of_saved_pt: str, pt_save_path: str,IMG_PARAM: dict):
+                name_of_saved_pt: str, pt_save_path: str, IMG_PARAM: dict, lr_scheduler = None):
     """
     Train the YOLO model and evaluate mAP50 and F1 on training and test sets.
     """
@@ -361,6 +361,10 @@ def train_model(model: torch.nn.Module, total_epochs: int, optimizer: torch.opti
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            if lr_scheduler is not None:
+                lr_scheduler.step()
+
             total_train_loss += loss.item()
 
             with torch.no_grad():
@@ -393,14 +397,14 @@ def train_model(model: torch.nn.Module, total_epochs: int, optimizer: torch.opti
                 for idx in range(batch_size):
                     all_pred_boxes.extend(batch_pred_boxes[batch_idx == idx].cpu().tolist())
 
-        # ➡️ Calculate mAP50 for the **Training Set**
+        #Calculate mAP50 for the **Training Set**
         if(epoch > 5):
             mAP50_score_training = test_map50_on_training_set(model,train_loader,device)
         else:
             mAP50_score_training = 0
         training_metrics["mAP50_training"].append(mAP50_score_training)
 
-        # ➡️ Append train loss
+        #Append train loss
         avg_train_loss = total_train_loss / len(train_loader)
         training_metrics["train_loss"].append(avg_train_loss)
 
@@ -418,7 +422,7 @@ def train_model(model: torch.nn.Module, total_epochs: int, optimizer: torch.opti
                 loss = yolo_loss(outputs, targets)
                 total_test_loss += loss.item()
 
-        # ➡️ Calculate mAP50 for the **Testing Set**
+        #Calculate mAP50 for the **Testing Set**
         if(epoch > 5):
             mAP50_score_testing = test_map50_on_training_set(model,test_loader,device)
         else:
@@ -426,21 +430,19 @@ def train_model(model: torch.nn.Module, total_epochs: int, optimizer: torch.opti
         
         training_metrics["mAP50_testing"].append(mAP50_score_testing)
 
-        # ➡️ Calculate average F1 for test set
+        #Calculate average F1 for test set
         df = create_table_from_pt_nms_for_training_F1(model,IMG_PARAM)
         f1_test = evaluate_f1_score_test(df)
         training_metrics["testing-F1"].append(f1_test)
 
-        # ➡️ Append test loss
+        #Append test loss
         avg_test_loss = total_test_loss / len(test_loader)
         training_metrics["test_loss"].append(avg_test_loss)
 
-        # ➡️ Logging
         print(f"Epoch {epoch+1}/{total_epochs} | Mean F1 Test: {f1_test:.4f} | mAP50 Test: {mAP50_score_testing:.4f} | Test Loss: {total_test_loss:.4f}")
-        # ➡️ Logging
         print(f"Epoch {epoch+1}/{total_epochs} | mAP50 Train: {mAP50_score_training:.4f} | Train Loss: {total_train_loss:.4f}")
         
-        # ➡️ Save the model
+        #Save the model
         if (epoch + 1) % per_epoch_save == 0 or (epoch + 1) == total_epochs:
             model_path = os.path.join(pt_save_path, f"{name_of_saved_pt}_{epoch+1}.pt")
             torch.save(model.state_dict(), model_path)
