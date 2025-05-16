@@ -453,7 +453,7 @@ def train_model(model: torch.nn.Module, total_epochs: int, optimizer: torch.opti
             print(f"✅ New best loss: {best_train_loss:.4f}")
             print(f"✅ Best model saved to: {best_model_path}")
 
-        if epoch > -1 and f1_test > best_f1_score:
+        if epoch > 80 and f1_test > best_f1_score:
             best_f1_score = f1_test
             f1_best_model = type(model)()  # Create a new instance of the model
             f1_best_model.load_state_dict(model.state_dict())
