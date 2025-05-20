@@ -36,6 +36,7 @@ train_dataset = YoloGridDataset(
 train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 EPOCHS = 100
+lr_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1e-3, end_factor=1e-5, total_iters=EPOCHS)
 name_of_saved_pt = "YoloV8Main2"
 
 
