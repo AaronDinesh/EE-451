@@ -838,7 +838,7 @@ def create_table_from_pt_nms(data_root_dir: str=None, output_dir_root: str=None,
     GRID_SIZE = IMG_PARAM["GRID_SIZE"]
 
 
-    test_dir = Path(f"{data_root_dir}/test/images")
+    test_dir = Path(f"{data_root_dir}")
     img_exts = [".jpg", ".png", ".jpeg"]
     image_paths = [f for f in test_dir.iterdir() if f.suffix.lower() in img_exts]
 

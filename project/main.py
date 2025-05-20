@@ -6,7 +6,9 @@ from src.models import YOLOv8Lite
 current_dir = os.getcwd()
 threshold = 0.11
 model_name = "CURRENT_BEST.pt"
-test_root_dir = Path(f'{current_dir}/data')
+
+# PUT THE DIRECTORY PATH OF TEST IMAGES
+test_root_dir = Path(f'{current_dir}/data/test/images')
 
 IMG_PARAM = {}
 IMG_PARAM["IMG_SIZE"] = 640
